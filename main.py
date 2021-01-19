@@ -7,13 +7,15 @@ import os
 from msvcrt import getch
 
 
-def get_thread_name(url):
+def get_thread_subject(url):
     page = requests.get(url)
     soup = BeautifulSoup(page.content, "html.parser")
 
-    name = soup.findAll("span", {"class": "subject"})[1].get_text()
+    subject = soup.findAll("span", {"class": "subject"})[1].get_text()
+    if subject == "":
+        subject = soup.find("blockquote", {"class": "postMessage"}).get_text()
 
-    return name
+    return subject
 
 
 def get_files(url):
@@ -23,8 +25,14 @@ def get_files(url):
     links = soup.findAll("div", {"class": "fileText"})
 
     files = []
+    spoiler_count = 0
     for link in links:
         filename = link.find("a").get_text()
+
+        if filename == "Spoiler Image":
+            spoiler_count += 1
+            filename = f"spoiler-image{spoiler_count}.png"
+
         url = "https:" + link.find("a")["href"]
         files.append([filename, url])
 
@@ -34,8 +42,8 @@ def get_files(url):
 def download(files, url):
     board = url.split(".org/")[1].split("/")[0]
     thread = url.split("/thread/")[1]
-    
-    get_thread_name(url)
+
+    get_thread_subject(url)
 
     # Create folder
     folder = "threads/" + board + " - " + thread + "/"
@@ -46,19 +54,20 @@ def download(files, url):
     for file in files:
         file_name = file[0]
         file_url = file[1]
-        
+
         r = requests.get(file_url)
         open(folder + file_name, "wb").write(r.content)
-    
+
     # Create file with info
     with open(folder + "info.txt", "w") as f:
         f.write(f"Board: /{board}/ \n")
-        f.write(f"Thread Subject: {get_thread_name(url)} \n")
+        f.write(f"Thread Subject: {get_thread_subject(url)} \n")
 
         date = datetime.now().strftime("%m/%d/%Y %H:%M:%S")
         f.write(f"Downloaded on: {date} \n")
 
-        f.write(f"Images downloaded: {len(files)} ")
+        f.write(f"Images downloaded: {len(files)} \n")
+        f.write("\n" + url)
 
 
 if __name__ == "__main__":
